@@ -495,22 +495,25 @@ static int do_python(rlm_python_t *inst, REQUEST *request, PyObject *pFunc, char
 	}
 	/*
 	 *	The function returns either:
-	 *  1. (returnvalue, replyTuple, configTuple), where
+	 *  1. (returnvalue, replyTuple, configTuple, packetTuple), where
 	 *   - returnvalue is one of the constants RLM_*
-	 *   - replyTuple and configTuple are tuples of string
+	 *   - replyTuple, configTuple and packetTuple are tuples of string
 	 *      tuples of size 2
+         *
+         *  2. (returnvalue, replyTuple, configTuple)
 	 *
-	 *  2. the function return value alone
+	 *  3. the function return value alone
 	 *
-	 *  3. None - default return value is set
+	 *  4. None - default return value is set
 	 *
 	 * xxx This code is messy!
 	 */
 	if (PyTuple_CheckExact(pRet)) {
 		PyObject *pTupleInt;
+		Py_ssize_t tuple_size = PyTuple_GET_SIZE(pRet);
 
-		if (PyTuple_GET_SIZE(pRet) != 3) {
-			radlog(L_ERR, "rlm_python:%s: tuple must be (return, replyTuple, configTuple)", funcname);
+		if (tuple_size != 3 && tuple_size != 4) {
+			radlog(L_ERR, "rlm_python:%s: tuple must be (return, replyTuple, configTuple[, packetTuple])", funcname);
 			ret = RLM_MODULE_FAIL;
 			goto finish;
 		}
@@ -529,6 +532,11 @@ static int do_python(rlm_python_t *inst, REQUEST *request, PyObject *pFunc, char
 		/* Config item tuple */
 		python_vptuple(&request->config_items,
 			       PyTuple_GET_ITEM(pRet, 2), funcname);
+		/* Packet tuple */
+		if (tuple_size >= 4) {
+			python_vptuple(&request->packet->vps,
+				       PyTuple_GET_ITEM(pRet, 3), funcname);
+		}
 
 	} else if (PyInt_CheckExact(pRet)) {
 		/* Just an integer */
